@@ -51,7 +51,7 @@ class AgencyMembership(Base, ContentMixin, TimestampMixin, ORMSearchable):
             'memberships',
             cascade='all, delete-orphan',
             lazy='dynamic',
-            order_by='AgencyMembership.order'
+            order_by='AgencyMembership.order_within_agency'
         )
     )
 
@@ -69,7 +69,10 @@ class AgencyMembership(Base, ContentMixin, TimestampMixin, ORMSearchable):
     )
 
     #: the position of the membership within the agency
-    order = Column(Integer, nullable=False)
+    order_within_agency = Column(Integer, nullable=False)
+
+    #: the position of the membership within all memberships of a person
+    order_within_person = Column(Integer, nullable=False)
 
     #: describes the membership
     title = Column(Text, nullable=False)
@@ -80,11 +83,20 @@ class AgencyMembership(Base, ContentMixin, TimestampMixin, ORMSearchable):
     @property
     def siblings(self):
         """ Returns a query that includes all siblings, including the item
-        itself.
-
+        itself ordered by `order_within_agency`.
         """
         query = object_session(self).query(self.__class__)
-        query = query.order_by(self.__class__.order)
+        query = query.order_by(self.__class__.order_within_agency)
+        query = query.filter(self.__class__.agency == self.agency)
+        return query
+
+    @property
+    def siblings_for_person(self):
+        """ Returns a query that includes all siblings, including the item
+        itself ordered by `order_within_person`.
+        """
+        query = object_session(self).query(self.__class__)
+        query = query.order_by(self.__class__.order_within_person)
         query = query.filter(self.__class__.agency == self.agency)
         return query
 

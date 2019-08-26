@@ -17,12 +17,19 @@ class AgencyMembershipCollection(GenericCollection):
     def model_class(self):
         return AgencyMembership
 
-    def query(self):
-        query = super(AgencyMembershipCollection, self).query()
-        return query.order_by(self.model_class.order)
+    def by_id(self, id):
+        return super(AgencyMembershipCollection, self).query().filter(
+            self.primary_key == id).first()
 
-    def move(self, subject, target, direction):
-        """ Takes the given subject and moves it somehwere in relation to the
+    def query(self, order_by=None):
+        query = super(AgencyMembershipCollection, self).query()
+        if not order_by:
+            return query
+        assert hasattr(self.model_class, order_by)
+        return query.order_by(getattr(self.model_class, order_by))
+
+    def move(self, subject, target, direction, move_on_col):
+        """ Takes the given subject and moves it somewhere in relation to the
         target.
 
         :subject:
@@ -36,13 +43,21 @@ class AgencyMembershipCollection(GenericCollection):
             :attr:`MoveDirection.above` if the subject should be moved
             above the target, or :attr:`MoveDirection.below` if the subject
             should be moved below the target.
+        :move_on_col:
+            Designates the column for which the new order should be evaluated.
+            Possible values are `order_within_agency` and
+            `order_within_person`.
 
         """
-        assert direction in MoveDirection
-        assert subject != target
-        assert target.agency_id == subject.agency_id
+        assert isinstance(target, self.model_class)
+        assert isinstance(subject, self.model_class)
+        assert hasattr(subject, move_on_col)
+        assert hasattr(target, move_on_col)
 
-        siblings = target.siblings.all()
+        if move_on_col == 'order_within_person':
+            siblings = target.siblings_for_person.all()
+        else:
+            siblings = target.siblings.all()
 
         def new_order():
             for sibling in siblings:
@@ -62,4 +77,4 @@ class AgencyMembershipCollection(GenericCollection):
                 yield sibling
 
         for order, sibling in enumerate(new_order()):
-            sibling.order = order
+            setattr(sibling, move_on_col, order)
